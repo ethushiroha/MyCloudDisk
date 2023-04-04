@@ -1,0 +1,26 @@
+apiVersion: v1
+
+jwt:
+  secret: "testSecret"
+  timeout: 3600
+
+database:
+  DBType: mysql
+  Username: root
+  Password: root@123
+  Host: 127.0.0.1:3306
+  DBName: MyCloudDisk
+  Charset: utf8
+  ParseTime: True
+  MaxIdleConns: 30
+  MaxOpenConns: 40
+
+redis:
+  Host: 127.0.0.1:32768
+  Password: redispw
+
+server:
+  backend_url: '127.0.0.1:9999'
+
+disk:
+  home: /Users/shirohaethu/Documents/project/go_project/MyCloudDisk/tmp/

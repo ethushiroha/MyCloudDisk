@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no"
+          name="viewport">
+    <title>风间网盘-我的文件</title>
+    <link rel="shortcut icon" href="/static/img/yun.png"/>
+    <link rel="stylesheet" href="/static/u-admin/dist/modules/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/u-admin/dist/modules/ionicons/css/ionicons.min.css">
+    <link rel="stylesheet"
+          href="/static/u-admin/dist/modules/fontawesome/web-fonts-with-css/css/fontawesome-all.min.css">
+
+    <link rel="stylesheet" href="/static/u-admin/dist/modules/summernote/summernote-lite.css">
+    <link rel="stylesheet" href="/static/u-admin/dist/modules/flag-icon-css/css/flag-icon.min.css">
+    <link rel="stylesheet" href="/static/u-admin/dist/css/demo.css">
+    <link rel="stylesheet" href="/static/u-admin/dist/css/style.css">
+    <link rel="stylesheet" href="/static/plug-ins/xcConfirm/css/xcConfirm.css">
+    <link rel="stylesheet" href="/static/plug-ins/context-menu/css/contextMenu.css">
+    <style>
+        .files-items {
+            margin-top: -20px;
+            border-bottom: 1px dashed #bdc3c7;
+            border-top: 1px dashed #bdc3c7;
+        }
+
+        .files-items:hover {
+            background: #F4FBFF;
+        }
+    </style>
+
+</head>
+
+<body>
+<div id="app">
+    <div class="main-wrapper">
+        <div class="navbar-bg"></div>
+        {{template "menu-top" .}}
+        {{template "menu-sidebar" .}}
+        <div class="main-content" style="min-height: 627px;">
+            <section class="section">
+                <h1 class="section-header">
+                    <div><i class="ion ion-folder"></i> 全部文件 <span style="color: red;font-size: 14px"></span></div>
+                </h1>
+                <div class="row">
+                    <div class="col-12 col-sm-12 col-lg-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <nav aria-label="breadcrumb" class="empty-space">
+                                    <ol class="breadcrumb" id="insideFiles"></ol>
+                                </nav>
+                                <div class="row" style="margin-top: -10px;">
+                                    <div class="col-12 col-sm-12 col-lg-12 table-responsive">
+                                        <table class="table tab-bordered text-nowrap" id="files-table">
+                                            <tr id="files-table-title" class="empty-space">
+                                                <th></th>
+                                                <th>名称</th>
+                                                <th>类型</th>
+                                                <th>扩展名</th>
+                                                <th>大小</th>
+                                                <th>下载次数</th>
+                                                <th>上传时间</th>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="float-right">
+                                            <input class="filebutton" type="file" style="display: none;"  onchange="fileSelected()">
+                                            <a href="#" onclick="openFileDialog()" class="btn btn-sm btn-outline-success"><i class="icon ion-plus"></i>
+                                            上传文件
+                                            </a>
+                                            <a href="javaScript:addFolderElement()"
+                                               class="btn btn-sm btn-outline-success"><i class="icon ion-plus"></i>
+                                                创建文件夹</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <span id="nowF" style="display: none">{{.fId}}</span>
+                <span id="preF" style="display: none">{{.parentFolder.ParentFolderId}}</span>
+                <span id="tarFolder" style="display: none"></span>
+                <span id="tarFile" style="display: none"></span>
+            </section>
+        </div>
+        {{template "menu-footer"}}
+    </div>
+</div>
+<script src="/static/js/jquery.min.js"></script>
+<script src="/static/plug-ins/context-menu/js/jquery.contextMenu.min.js"></script>
+<script src="/static/plug-ins/context-menu/js/jquery.ui.position.min.js"></script>
+<script src="/static/plug-ins/xcConfirm/js/xcConfirm.js"></script>
+
+<!--<script src="/static/u-admin/dist/modules/jquery.min.js"></script>-->
+<script src="/static/u-admin/dist/modules/popper.js"></script>
+<script src="/static/u-admin/dist/modules/tooltip.js"></script>
+<script src="/static/u-admin/dist/modules/bootstrap/js/bootstrap.min.js"></script>
+<script src="/static/u-admin/dist/modules/nicescroll/jquery.nicescroll.min.js"></script>
+<script src="/static/u-admin/dist/modules/scroll-up-bar/dist/scroll-up-bar.min.js"></script>
+<script src="/static/u-admin/dist/js/sa-functions.js"></script>
+
+<script src="/static/u-admin/dist/modules/chart.min.js"></script>
+<script src="/static/u-admin/dist/modules/summernote/summernote-lite.js"></script>
+
+<script src="/static/u-admin/dist/js/scripts.js"></script>
+<script src="/static/u-admin/dist/js/custom.js"></script>
+<script src="/static/u-admin/dist/js/demo.js"></script>
+
+
+
+<script type="text/javascript">
+    function enterFileFolder(folderID) {
+        return function() {
+            showFileFolder(folderID)
+        }
+    }
+
+    function downloadFile(fileID, fileName) {
+        return function () {
+            // console.log("321")
+            let xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/v1/home/download', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader("Authorization", "Bearer " + sessionStorage.getItem("token"))
+            xhr.setRequestHeader('Accept', '*/*');
+            xhr.responseType = 'arraybuffer';
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    // 服务器返回的数据是二进制数据，需要通过Blob对象创建URL来下载
+                    let blob = new Blob([xhr.response], {type: 'application/octet-stream'});
+                    let url = URL.createObjectURL(blob);
+
+                    // 创建一个下载链接，让用户点击后下载文件
+                    let link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+                    link.click();
+
+                    // 释放URL对象
+                    URL.revokeObjectURL(url);
+                } else {
+                    console.error('下载文件失败');
+                }
+            };
+            xhr.send(JSON.stringify({"fileID": fileID}))
+        }
+    }
+
+    function myUploadFile(file) {
+        let uploadURL = "/api/v1/home/upload?folderID=" + sessionStorage.getItem("folderID");
+        let formData = new FormData();
+        formData.append("file", file);
+
+        let request = new XMLHttpRequest();
+        request.open('POST', uploadURL, true);
+        request.setRequestHeader("Authorization", "Bearer " + sessionStorage.getItem("token"))
+        request.setRequestHeader('Accept', '*/*');
+        request.onload = function() {
+            if (request.status === 200) {
+                alert("上传成功");
+                showFileFolder(parseInt(sessionStorage.getItem("folderID")));
+            } else {
+                alert("上传失败");
+            }
+        }
+
+
+        request.send(formData);
+    }
+
+    function fileSelected() {
+        let fbutton = $(".filebutton")[0]
+        let file = fbutton.files[0]
+        fbutton.value = "";
+        myUploadFile(file);
+    }
+
+    function openFileDialog() {
+        $(".filebutton").click()
+    }
+</script>
+<script type="text/javascript">
+    function initFileFolders(fileFolders) {
+        if (fileFolders == null) {
+            return
+        }
+        let ele = document.getElementById("files-table")
+
+        for (let i = 0; i < fileFolders.length; i++) {
+            let row = ele.insertRow();
+            row.className = "files-items folders addFolders"
+            // row.classList = ["files-item", "folders", "myAddRow"]
+
+            let cell = row.insertCell()
+            let span = document.createElement("span")
+            span.style = "display: none"
+            let i1 = document.createElement("i")
+            i1.style = "font-size: 24px; color: orange"
+            i1.className = "icon ion-android-folder"
+            cell.appendChild(span)
+            cell.appendChild(i1)
+
+            cell = row.insertCell()
+            let a = document.createElement("a")
+            a.href = "#"
+            // console.log(i, fileFolders[i].ID)
+            a.onclick = enterFileFolder(fileFolders[i].ID)
+            a.style = "font-weight: 700; color: black"
+            a.innerHTML = fileFolders[i].FileFolderName
+            cell.appendChild(a)
+
+            cell = row.insertCell()
+            cell.innerHTML = "文件夹"
+
+            for (let i = 0; i < 4; i++) {
+                cell = row.insertCell()
+                cell.innerHTML = "-"
+            }
+        }
+    }
+
+    function initFiles(files) {
+        if (files == null) {
+            return
+        }
+        let ele = document.getElementById("files-table")
+
+        for (let i = 0; i < files.length; i++) {
+            let row = ele.insertRow();
+            row.className = "files-items files addFiles"
+
+            let cell = row.insertCell()
+            let span = document.createElement("span")
+            span.style = "display: none"
+            let i1 = document.createElement("i")
+            // if files[i].type
+            switch (files[i].Type) {
+                case 1:
+                    i1.style="font-size:24px; color: #3498db"
+                    i1.className="icon ion-document-text"
+                    break
+                case 2:
+                    i1.style="font-size: 24px; color: #28a745"
+                    i1.className="icon ion-image"
+                    break
+                // todo:
+            }
+            cell.appendChild(span)
+            cell.appendChild(i1)
+
+            cell = row.insertCell()
+            let a = document.createElement("a")
+            a.href = "#"
+            a.className = "link"
+            a.fileID = files[i].ID
+            a.filename = files[i].FileName
+            // console.log(i, files[i].ID)
+            a.onclick = downloadFile(files[i].ID, files[i].FileName)
+            a.style = "font-weight: 700; color: black"
+            a.innerHTML = files[i].FileName
+
+
+
+            cell.appendChild(a)
+
+            cell = row.insertCell()
+            cell.style = "font-weight: 300"
+            switch (files[i].Type) {
+                case 1:
+                    cell.innerHTML = "文档"
+                    break
+                case 2:
+                    cell.innerHTML = "图片"
+                    break
+                case 3:
+                    cell.innerHTML = "视频"
+                    break
+                case 4:
+                    cell.innerHTML = "音乐"
+                    break
+                case 5:
+                    cell.innerHTML = "其他"
+                    break
+            }
+
+            cell = row.insertCell()
+            cell.style = "font-weight: 300"
+            cell.innerHTML = files[i].Postfix
+
+            cell = row.insertCell()
+            cell.style = "font-weight: 300"
+            cell.innerHTML = files[i].Size + " " + files[i].SizeStr
+
+            cell = row.insertCell()
+            cell.style = "font-weight: 300"
+            cell.innerHTML = files[i].DownloadNum
+
+            cell = row.insertCell()
+            cell.style = "font-weight: 300"
+            cell.innerHTML = files[i].UpdateTime
+        }
+
+        $(".link").contextMenu({
+            width: 100, // width
+            itemHeight: 30, // 菜单项height
+            bgColor: "#fff", // 背景颜色
+            color: "#333", // 字体颜色
+            fontSize: 12, // 字体大小
+            hoverBgColor: "#3498db", // hover背景颜色
+            target: function (ele) { // 当前元素
+
+            },
+            menu: [{ // 菜单项
+                fileID: ele.fileID,
+                text: " 下载",
+                callback: function () {
+                    let id = $('.flag td a').html()
+                    console.log(id)
+                    console.log(this.fileID)
+                }
+            },
+                {
+                    text: " 分享",
+                    callback: function () {
+                        var location = window.location.href;
+                        let strings = location.split("home");
+                        $.ajax({
+                            url: "getQrCode?id=" + $('#tarFile').html() + "&url=" + strings[0] + "file/share",
+                            type: "POST",
+                            async: false,
+                            success: function (data) {
+                                var txt = "链接：<a>" + data["url"] + "<a/><br/>" +
+                                    "提取码：<a>"+ data["code"] + "<a/>";
+                                var option = {
+                                    title: "分享你的文件",
+                                };
+                                window.wxc.xcConfirm(txt, "custom", option);
+                            }
+                        });
+                    }
+                },
+                {
+                    text: " 重命名",
+                    callback: function () {
+                        let id = $('.flag td span').html();
+                        let name = $('.flag td a').html();
+                        let html = $('.flag td').eq(1).html($('' +
+                            "<form id='updateFileNameForm' action='updateFileName' method='post'>" +
+                            "<input id='updateFileName' name='myFileName' autocomplete='off' type='text' onblur='checkUpdateFile()' value='" + name + "'>" +
+                            "<input type='hidden' name='myFileId' value='" + id + "'>" +
+                            "</form>" +
+                            ''));
+                    }
+                },
+                {
+                    text: " 删除",
+                    callback: function () {
+                        let id = $('#tarFile').html();
+                        var location = window.location.href;
+                        let strings = location.split("home");
+                        if (id != "") {
+                            window.location.href = strings[0] + "home/deleteFile?fId=" + id + "&folder=" + $('#nowF').html();
+                        } else {
+                            return;
+                        }
+                    }
+                },
+                {
+                    text: " 在线浏览",
+                    callback: function () {
+                        alert("在线浏览");
+                    }
+                }
+            ]
+        })
+    }
+
+    function initParents(parents) {
+        let myAddParentFolders = document.getElementsByClassName("myAddParentFolders")
+        let length = myAddParentFolders.length
+        for (let i = 0; i < length; i++) {
+            myAddParentFolders[0].remove()
+        }
+
+        let ele = document.getElementById("insideFiles")
+
+        for (let parent of parents) {
+            let li = document.createElement("li")
+            li.className = "breadcrumb-item myAddParentFolders"
+
+            let a = document.createElement("a")
+            a.href ="#"
+            a.style = "font-weight:bold"
+            a.onclick = enterFileFolder(parent.ID)
+            a.innerHTML = parent.FileFolderName
+            li.appendChild(a)
+            ele.appendChild(li)
+        }
+    }
+</script>
+
+<script type="text/javascript">
+    function showFileFolder(folderID) {
+        $.ajax({
+            type: "POST",
+            dataType: "json",
+            url: '/api/v1/home/files',
+            contentType: "application/json",
+            headers: {
+                "Authorization": "Bearer " + sessionStorage.getItem("token")
+            },
+            data:JSON.stringify({
+                "folderID": folderID
+            }),
+            success: function (result) {
+                if (result.status === "success") {
+                    sessionStorage.setItem("folderID", folderID)
+                    // document.getElementById("selfRootFolder").innerHTML = result.data.user.Username
+                    // initFiles(result.data.files)
+                    let eles = document.getElementsByClassName("addFiles")
+                    let i = eles.length
+                    // console.log(eles.length)
+                    for (; i > 0; i--) {
+                        eles[0].remove()
+                    }
+
+                    eles = document.getElementsByClassName("addFolders")
+                    i = eles.length
+                    for (; i > 0; i--) {
+                        eles[0].remove()
+                    }
+
+                    initParents(result.data.allParents)
+                    initFileFolders(result.data.fileFolder)
+                    initFiles(result.data.files)
+                }else {
+                    alert(result.message)
+                }
+            }
+        });
+    }
+
+    showFileFolder(-1);
+</script>
+<script type="text/javascript">
+    $(function () {
+        $('.folders').dblclick(function () {
+            let id = $(this).children("td").children("span").html();
+            var location = window.location.href;
+            let strings = location.split("?");
+            if (id != "") {
+                window.location.href = strings[0] + "?fId=" + id;
+            } else {
+                return;
+            }
+        });
+        $('.files').dblclick(function () {
+            let id = $(this).children("td").children("span").html();
+            var location = window.location.href;
+            let strings = location.split("home");
+            console.log(strings)
+            if (id != "") {
+                window.location.href = strings[0] + "home/downloadFile?time=" + new Date().getTime() + "&tip=" + Math.random() * 1000000 + "&fId=" + id;
+            } else {
+                return;
+            }
+        });
+        $('.folders').hover(function () {
+            let id = $(this).children("td").children("span").html();
+            $('#tarFolder').html(id);
+            $(this).siblings().removeClass('flag');
+            $(this).addClass('flag');
+        }, function () {
+        });
+        $('.files').hover(function () {
+            let id = $(this).children("td").children("span").html();
+            $('#tarFile').html(id);
+            $(this).siblings().removeClass('flag');
+            $(this).addClass('flag');
+        }, function () {
+        });
+    });
+</script>
+
+<script type="text/javascript">
+    console.log("123")
+
+
+    // $(".files").contextMenu({
+    //     width: 100, // width
+    //     itemHeight: 30, // 菜单项height
+    //     bgColor: "#fff", // 背景颜色
+    //     color: "#333", // 字体颜色
+    //     fontSize: 12, // 字体大小
+    //     hoverBgColor: "#3498db", // hover背景颜色
+    //     target: function (ele) { // 当前元素
+    //         console.log(ele);
+    //     },
+    //     menu: [{ // 菜单项
+    //         text: " 下载",
+    //         callback: function () {
+    //             let id = $('#tarFile').html();
+    //             var location = window.location.href;
+    //             let strings = location.split("home");
+    //             if (id != "") {
+    //                 window.location.href = strings[0] + "home/downloadFile?time=" + new Date().getTime() + "&tip=" + Math.random() * 1000000 + "&fId=" + id;
+    //             } else {
+    //                 return;
+    //             }
+    //         }
+    //     },
+    //         {
+    //             text: " 分享",
+    //             callback: function () {
+    //                 var location = window.location.href;
+    //                 let strings = location.split("home");
+    //                 $.ajax({
+    //                     url: "getQrCode?id=" + $('#tarFile').html() + "&url=" + strings[0] + "file/share",
+    //                     type: "POST",
+    //                     async: false,
+    //                     success: function (data) {
+    //                         var txt = "链接：<a>" + data["url"] + "<a/><br/>" +
+    //                             "提取码：<a>"+ data["code"] + "<a/>";
+    //                         var option = {
+    //                             title: "分享你的文件",
+    //                         };
+    //                         window.wxc.xcConfirm(txt, "custom", option);
+    //                     }
+    //                 });
+    //             }
+    //         },
+    //         {
+    //             text: " 重命名",
+    //             callback: function () {
+    //                 let id = $('.flag td span').html();
+    //                 let name = $('.flag td a').html();
+    //                 let html = $('.flag td').eq(1).html($('' +
+    //                     "<form id='updateFileNameForm' action='updateFileName' method='post'>" +
+    //                     "<input id='updateFileName' name='myFileName' autocomplete='off' type='text' onblur='checkUpdateFile()' value='" + name + "'>" +
+    //                     "<input type='hidden' name='myFileId' value='" + id + "'>" +
+    //                     "</form>" +
+    //                     ''));
+    //             }
+    //         },
+    //         {
+    //             text: " 删除",
+    //             callback: function () {
+    //                 let id = $('#tarFile').html();
+    //                 var location = window.location.href;
+    //                 let strings = location.split("home");
+    //                 if (id != "") {
+    //                     window.location.href = strings[0] + "home/deleteFile?fId=" + id + "&folder=" + $('#nowF').html();
+    //                 } else {
+    //                     return;
+    //                 }
+    //             }
+    //         },
+    //         {
+    //             text: " 在线浏览",
+    //             callback: function () {
+    //                 alert("在线浏览");
+    //             }
+    //         }
+    //     ]
+    //
+    // });
+    //
+    // $(".folders").contextMenu({
+    //     width: 100, // width
+    //     itemHeight: 30, // 菜单项height
+    //     bgColor: "#fff", // 背景颜色
+    //     color: "#333", // 字体颜色
+    //     fontSize: 12, // 字体大小
+    //     hoverBgColor: "#3498db", // hover背景颜色
+    //     target: function (ele) { // 当前元素
+    //         console.log(ele);
+    //     },
+    //     menu: [{ // 菜单项
+    //         text: " 打开",
+    //         callback: function () {
+    //             let id = $('#tarFolder').html();
+    //             var location = window.location.href;
+    //             let strings = location.split("?");
+    //             if (id != "") {
+    //                 window.location.href = strings[0] + "?fId=" + id;
+    //             } else {
+    //                 return;
+    //             }
+    //         }
+    //     },
+    //         {
+    //             text: " 返回上一级",
+    //             callback: function () {
+    //                 toPreFolder();
+    //             }
+    //         },
+    //         {
+    //             text: " 重命名",
+    //             callback: function () {
+    //                 let id = $('.flag td span').html();
+    //                 let name = $('.flag td a').html();
+    //                 name = name.replace(/(^\s*)|(\s*$)/g, "");
+    //                 let html = $('.flag td').eq(1).html($('' +
+    //                     "<form id='updateFolderForm' action='updateFolder' method='post'>" +
+    //                     "<input id='updateFolderName' name='fileFolderName' autocomplete='off' type='text' onblur='checkUpdateFolder()' value='" + name + "'>" +
+    //                     "<input type='hidden' name='fileFolderId' value='" + id + "'>" +
+    //                     "</form>" +
+    //                     ''));
+    //             }
+    //         },
+    //         {
+    //             text: " 新建文件夹",
+    //             callback: function () {
+    //                 addFolderElement();
+    //             }
+    //         },
+    //         {
+    //             text: " 清空并删除",
+    //             callback: function () {
+    //                 let id = $('#tarFolder').html();
+    //                 var location = window.location.href;
+    //                 let strings = location.split("home");
+    //                 if (id != "") {
+    //                     window.location.href = strings[0] + "home/deleteFolder?fId=" + id;
+    //                 } else {
+    //                     return;
+    //                 }
+    //             }
+    //         }
+    //     ]
+    //
+    // });
+    // $(".empty-space").contextMenu({
+    //     width: 100, // width
+    //     itemHeight: 30, // 菜单项height
+    //     bgColor: "#fff", // 背景颜色
+    //     color: "#333", // 字体颜色
+    //     fontSize: 12, // 字体大小
+    //     hoverBgColor: "#3498db", // hover背景颜色
+    //     target: function (ele) { // 当前元素
+    //         console.log(ele);
+    //     },
+    //     menu: [
+    //         {
+    //             text: " 新建文件夹",
+    //             callback: function () {
+    //                 addFolderElement();
+    //             }
+    //         },
+    //         {
+    //             text: " 返回上一级",
+    //             callback: function () {
+    //                 toPreFolder();
+    //             }
+    //         }
+    //     ]
+    //
+    // });
+
+    function toPreFolder() {
+        var location = window.location.href;
+        let strings = location.split("?");
+        var pre = $('#preF').html();
+        if (pre != "") {
+            window.location.href = strings[0] + "?fId=" + pre;
+        } else {
+            return;
+        }
+    }
+
+    function addFolderElement() {
+        $("<tr class='files-items folders' id='addFolderElement'><td><i style='font-size: 24px;color: orange' class='icon ion-android-folder'></i></td>" +
+            "<td>" +
+            // "<form id='addFolderForm' action='addFolder' method='post'>" +
+            "<input id='newFolder'  autocomplete='off' name='fileFolderName' type='text' onblur='checkAddFolder()'>" +
+            // "</form>" +
+            "</td>" +
+            "<td style='font-weight: 300'>文件夹</td>" +
+            "<td style='font-weight: 300'>-</td>" +
+            "<td style='font-weight: 300'>-</td>" +
+            "</tr>").insertAfter($('#files-table-title'));
+        $('#newFolder').focus();
+    }
+
+    function checkAddFolder() {
+        let name = $.trim($("#newFolder").val());
+        let folderID = parseInt(sessionStorage.getItem("folderID"));
+        $.ajax({
+            type: "POST",
+            dataType: "json",
+            url: '/api/v1/home/addFolder',
+            contentType: "application/json",
+            data:JSON.stringify({
+                "folderName": name,
+                "parentFolderID": folderID,
+            }),
+            headers: {
+                "Authorization": "Bearer " + sessionStorage.getItem("token"),
+            },
+            success: function (result) {
+                if (result.status === 'success') {
+                    document.getElementById("addFolderElement").remove()
+                    showFileFolder(folderID)
+                }else {
+                    alert(result)
+                    console.log(result)
+                    alert(result.message)
+                }
+            }
+        });
+        // }
+    }
+
+    function checkUpdateFolder() {
+        var name = $.trim($("#updateFolderName").val());
+        var nameReg = /^[\u4E00-\u9FA5A-Za-z0-9]{2,20}$/;
+        if (!nameReg.test(name)) {
+            alert("文件夹格式错误！【汉字、字母、数字】");
+            var location = window.location.href;
+            window.location.href = location;
+        } else {
+            $('#updateFolderForm').submit();
+        }
+    }
+
+    function checkUpdateFile() {
+        var name = $.trim($("#updateFileName").val());
+        var nameReg = /^[^\u4E00-\u9FA5\uF900-\uFA2D\w-_]{2,20}$/;
+        if (!nameReg.test(name)) {
+            alert("文件夹格式错误！【汉字、字母、数字】");
+            var location = window.location.href;
+            window.location.href = location;
+        } else {
+            $('#updateFileNameForm').submit();
+        }
+    }
+</script>
+
+</body>
+</html>
